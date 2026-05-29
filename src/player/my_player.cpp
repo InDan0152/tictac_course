@@ -89,7 +89,7 @@ Point MyPlayer::make_move(const State &state) {
     std::vector<RatedMovePoint> immediate_def;     
     std::vector<RatedMovePoint> immediate_open_four;           
     std::vector<RatedMovePoint> moves;     
-    
+    // 1) Расчет веса для пустых клеток.
     for (int y = 0; y < rows; ++y) {
         for (int x = 0; x < cols; ++x) {
             if (state.get_value(x, y) != Sign::NONE) {
@@ -175,42 +175,113 @@ Point MyPlayer::make_move(const State &state) {
     }
     
     // для сортировки векторов
-    auto move_comparator = [](const RatedMovePoint& a, const RatedMovePoint& b) {
+    auto weight_comparator = [](const RatedMovePoint& a, const RatedMovePoint& b) {
         if (std::abs(a.weight - b.weight) > 0.0001) {
             return a.weight > b.weight;
         }
         return a.distance < b.distance;
     };
-    
-    Point result {0, 0};  
+    auto atk_weight_comparator = [](const RatedMovePoint& a, const RatedMovePoint& b) {
+        if (std::abs(a.atk_weight - b.atk_weight) > 0.0001) {
+            return a.atk_weight > b.atk_weight;
+        }
+        return a.distance < b.distance;
+    };
+    auto def_weight_comparator = [](const RatedMovePoint& a, const RatedMovePoint& b) {
+        if (std::abs(a.def_weight - b.def_weight) > 0.0001) {
+            return a.def_weight > b.def_weight;
+        }
+        return a.distance < b.distance;
+    };
+         
     // ВЫБОР ХОДА ПО ПРАВИЛАМ
-    // 1) Проверка на победу. Ищется клетка, которая завершит собственную линию до длины L. То есть нужно найти линию L-1, которую можно завершить. Если такая клетка есть, ход делается туда.
+    // 2) Проверка на победу. Ищется клетка, которая завершит собственную линию до длины L. 
+    //    То есть нужно найти линию L-1, которую можно завершить. Если такая клетка есть, ход делается туда. 
+    //    Если таких клеток несколько выбираем с большим весом защиты.
     if (!immediate_win.empty()) {
-        std::sort(immediate_win.begin(), immediate_win.end(), move_comparator);
-        result=immediate_win[0].point;
+        std::sort(immediate_win.begin(), immediate_win.end(), def_weight_comparator);
+        return immediate_win[0].point;
     }
-    // 2) Предотвращение проигрыша. Ищется клетка, которая позволит сопернику следующим ходом завершить линию до длины L. То есть нужно найти линию L-1, которую можно завершить. Если такая клетка есть, ход делается туда, чтобы её занять.
+    // 3) Предотвращение проигрыша. Ищется клетка, которая позволит сопернику следующим ходом завершить линию до длины L. 
+    //    То есть нужно найти линию L-1, которую можно завершить. Если такая клетка есть, ход делается туда, чтобы её занять. 
+    //    Если таких клеток несколько выбираем с большим весом атаки.
     if (!immediate_def.empty()) {
-        std::sort(immediate_def.begin(), immediate_def.end(), move_comparator);
-        result=immediate_def[0].point;
+        std::sort(immediate_def.begin(), immediate_def.end(), atk_weight_comparator);
+        return immediate_def[0].point;
     }
-    // 3) Проверка на победную четверку. Проверить можно ли сделать 4 в ряд с пустыми на концах. Комбинация ведёт к выигрышу на следующем ходу. Если есть, то делаем.
+    // 4) Проверка на победную четверку. Проверить можно ли сделать 4 в ряд с пустыми на концах. 
+    //    Комбинация ведёт к выигрышу на следующем ходу. Если есть, то делаем. 
+    //    Если таких клеток несколько выбираем с большим весом защиты.
     if (!immediate_open_four.empty()) {
-        std::sort(immediate_open_four.begin(), immediate_open_four.end(), move_comparator);
-        result=immediate_open_four[0].point;
+        std::sort(immediate_open_four.begin(), immediate_open_four.end(), def_weight_comparator);
+        return immediate_open_four[0].point;
     }
-    // 8) Из всех свободных клеток выбирается та, у которой итоговый вес оказался максимальным. Если таких несколько, то выбираем клетку ближе к центру поля.
+    // 5) Из всех свободных клеток выбирается та, у которой итоговый вес оказался максимальным. 
+    //    Если таких несколько, то выбираем клетку ближе к центру поля. Но если есть несколько клеток 
+    //    с одинаковым весом в одной линии и их атакующий вес больше защитного, то ставим X не подряд, а с другого конца линии.
     if (!moves.empty()) {
-        std::sort(moves.begin(), moves.end(), move_comparator);
-        result=moves[0].point;
-        //if (m_sign==Sign::X){
-        //    std::cout<<"XXX x="<<result.x<<" y="<<result.y<<" a="<<moves[0].atk_weight<<" d="<<moves[0].def_weight<<std::endl;
-        //}
-        //else{
-        //    std::cout<<"OOO x="<<result.x<<" y="<<result.y<<" a="<<moves[0].atk_weight<<" d="<<moves[0].def_weight<<std::endl;
-        //}
+        std::sort(moves.begin(), moves.end(), weight_comparator);
+        double first_weight = moves[0].weight;
+        std::vector<RatedMovePoint> atk_moves; // Все атакующие ходы, делящие максимальный балл
+        for (const auto& m : moves) {            
+            if (std::abs(m.weight - first_weight) < 0.0001) {
+                if (m.atk_weight > m.def_weight) atk_moves.push_back(m);
+            } else {
+                break; // Массив отсортирован по убыванию, дальше веса меньше
+            }
+        }
+        if (atk_moves.size() > 1) {
+           for (size_t i = 0; i < atk_moves.size(); ++i) {
+                for (size_t j = i + 1; j < atk_moves.size(); ++j) {
+                    const auto& m1 = atk_moves[i];
+                    const auto& m2 = atk_moves[j];
+                    int dx = m2.point.x - m1.point.x;
+                    int dy = m2.point.y - m1.point.y;
+                    bool same_line = (dx == 0 || dy == 0 || std::abs(dx) == std::abs(dy));// m1 и m2 на одной линии
+                    int distance = std::max(std::abs(dx), std::abs(dy));// расстояние между m1 и m2
+                    if (same_line && distance > 1 && distance < win_len) {
+                        int step_x = (dx > 0) ? 1 : ((dx < 0) ? -1 : 0);
+                        int step_y = (dy > 0) ? 1 : ((dy < 0) ? -1 : 0);
+                        int near_m1 = 0; // количество наших крестиков рядом с m1
+                        int near_m2 = 0; // количество наших крестиков рядом с m2
+                        // Проверяем клетки, которая находится рядом с точкой m1
+                        int check_x1 = m1.point.x + step_x;
+                        int check_y1 = m1.point.y + step_y;
+                        int check_x2 = m1.point.x - step_x;
+                        int check_y2 = m1.point.y - step_y;
+                        if (check_x1 >= 0 && check_x1 < cols && check_y1 >= 0 && check_y1 < rows) {
+                            if (state.get_value(check_x1, check_y1)== m_sign) near_m1++;                            
+                        }
+                        if (check_x2 >= 0 && check_x2 < cols && check_y2 >= 0 && check_y2 < rows) {
+                            if (state.get_value(check_x2, check_y2)== m_sign) near_m1++;
+                        }
+                        // Проверяем клетки, которая находится рядом с точкой m2
+                        check_x1 = m2.point.x + step_x;
+                        check_y1 = m2.point.y + step_y;
+                        check_x2 = m2.point.x - step_x;
+                        check_y2 = m2.point.y - step_y;
+                        if (check_x1 >= 0 && check_x1 < cols && check_y1 >= 0 && check_y1 < rows) {
+                            if (state.get_value(check_x1, check_y1)== m_sign) near_m2++;
+                            
+                        }
+                        if (check_x2 >= 0 && check_x2 < cols && check_y2 >= 0 && check_y2 < rows) {
+                            if (state.get_value(check_x2, check_y2)== m_sign) near_m2++;
+                        }
+                        if (near_m1 > near_m2) {
+                            // Если рядом с m1 наших крестиков больше чем у m2, значит m2 — это другой свободный конец линии!
+                            return m2.point;
+                        }
+                        else{
+                            // Если рядом с m2 наших крестиков больше чем у m1, значит m1 — это другой свободный конец линии!
+                            return m1.point;
+                        }
+                    }
+                }
+            }
+        }
+        return moves[0].point;
     }    
-    return result;   
+    return Point{0, 0}; // нет свободных клеток, возвращаем 0,0 
 }
 
 void MyPlayer2::set_sign(Sign sign) { m_sign = sign; }
