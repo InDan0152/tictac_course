@@ -178,6 +178,9 @@ Point MyPlayer::make_move(const State &state) {
         if (std::abs(a.weight - b.weight) > 0.0001) {
             return a.weight > b.weight;
         }
+        if (std::abs(a.atk_weight - b.atk_weight) > 0.0001) {
+            return a.atk_weight > b.atk_weight;
+        }
         return a.distance < b.distance;
     };
     auto atk_weight_comparator = [](const RatedMovePoint& a, const RatedMovePoint& b) {
