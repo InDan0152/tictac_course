@@ -70,18 +70,18 @@ int  MyPlayer::check_line(const State &state, int start_x, int start_y, int dx, 
     if (after_x >= 0 && after_x < cols && after_y >= 0 && after_y < rows) {
         if (state.get_value(after_x, after_y) == Sign::NONE) open_after = true;
     }
+    
     if (count > 1){
         int weight = 1;
         for (int i=0; i < count; i++){
-            weight*=10; 
+            weight*=5; 
         }
-        if (open_before && open_after) weight *= 10; //*2 если открыта
+        if (open_before && open_after) weight *= 2; //*2 если открыта
         return weight;
     }
     else{
-        return count*10;
+        return count*5;
     }
-
 }
 
 Point MyPlayer::make_move(const State &state) {
@@ -98,7 +98,6 @@ Point MyPlayer::make_move(const State &state) {
     std::vector<RatedMovePoint> immediate_def;     
     std::vector<RatedMovePoint> immediate_open_four;           
     std::vector<RatedMovePoint> moves;     
-
     // 1) Расчет веса для пустых клеток.
     for (int y = 0; y < rows; ++y) {
         for (int x = 0; x < cols; ++x) {
@@ -187,17 +186,11 @@ Point MyPlayer::make_move(const State &state) {
         if (std::abs(a.atk_weight - b.atk_weight) > 0.0001) {
             return a.atk_weight > b.atk_weight;
         }
-        if (std::abs(a.def_weight - b.def_weight) > 0.0001) {
-            return a.def_weight > b.def_weight;
-        }
         return a.distance < b.distance;
     };
     auto def_weight_comparator = [](const RatedMovePoint& a, const RatedMovePoint& b) {
         if (std::abs(a.def_weight - b.def_weight) > 0.0001) {
             return a.def_weight > b.def_weight;
-        }
-        if (std::abs(a.atk_weight - b.atk_weight) > 0.0001) {
-            return a.atk_weight > b.atk_weight;
         }
         return a.distance < b.distance;
     };
@@ -207,21 +200,21 @@ Point MyPlayer::make_move(const State &state) {
     //    То есть нужно найти линию L-1, которую можно завершить. Если такая клетка есть, ход делается туда. 
     //    Если таких клеток несколько выбираем с большим весом защиты.
     if (!immediate_win.empty()) {
-        std::sort(immediate_win.begin(), immediate_win.end(), atk_weight_comparator);
+        std::sort(immediate_win.begin(), immediate_win.end(), def_weight_comparator);
         return immediate_win[0].point;
     }
     // 3) Предотвращение проигрыша. Ищется клетка, которая позволит сопернику следующим ходом завершить линию до длины L. 
     //    То есть нужно найти линию L-1, которую можно завершить. Если такая клетка есть, ход делается туда, чтобы её занять. 
     //    Если таких клеток несколько выбираем с большим весом атаки.
     if (!immediate_def.empty()) {
-        std::sort(immediate_def.begin(), immediate_def.end(), def_weight_comparator);
+        std::sort(immediate_def.begin(), immediate_def.end(), atk_weight_comparator);
         return immediate_def[0].point;
     }
     // 4) Проверка на победную четверку. Проверить можно ли сделать 4 в ряд с пустыми на концах. 
     //    Комбинация ведёт к выигрышу на следующем ходу. Если есть, то делаем. 
     //    Если таких клеток несколько выбираем с большим весом защиты.
     if (!immediate_open_four.empty()) {
-        std::sort(immediate_open_four.begin(), immediate_open_four.end(), atk_weight_comparator);
+        std::sort(immediate_open_four.begin(), immediate_open_four.end(), def_weight_comparator);
         return immediate_open_four[0].point;
     }
     // 5) Из всех свободных клеток выбирается та, у которой итоговый вес оказался максимальным. 
@@ -229,7 +222,6 @@ Point MyPlayer::make_move(const State &state) {
     //    с одинаковым весом в одной линии и их атакующий вес больше защитного, то ставим X не подряд, а с другого конца линии.
     if (!moves.empty()) {
         std::sort(moves.begin(), moves.end(), weight_comparator);
-        //return moves[0].point;
         double first_weight = moves[0].weight;
         std::vector<RatedMovePoint> atk_moves; // Все атакующие ходы, делящие максимальный балл
         for (const auto& m : moves) {            
@@ -271,7 +263,8 @@ Point MyPlayer::make_move(const State &state) {
                         check_x2 = m2.point.x - step_x;
                         check_y2 = m2.point.y - step_y;
                         if (check_x1 >= 0 && check_x1 < cols && check_y1 >= 0 && check_y1 < rows) {
-                            if (state.get_value(check_x1, check_y1)== m_sign) near_m2++;                     
+                            if (state.get_value(check_x1, check_y1)== m_sign) near_m2++;
+                            
                         }
                         if (check_x2 >= 0 && check_x2 < cols && check_y2 >= 0 && check_y2 < rows) {
                             if (state.get_value(check_x2, check_y2)== m_sign) near_m2++;
