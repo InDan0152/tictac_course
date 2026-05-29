@@ -1,6 +1,7 @@
 #include "my_player.hpp"
 #include <cstdlib>
 #include <iostream>
+#include <iomanip>
 #include <vector>
 #include <algorithm>
 #include <cmath>
@@ -49,7 +50,7 @@ int  MyPlayer::check_line(const State &state, int start_x, int start_y, int dx, 
         
         Sign cell = state.get_value(curr_x, curr_y);
         if (cell == opponent_sign || cell == Sign::WALL) {
-            return -1; 
+            return 0; 
         }
         if (cell == my_sign) {
             count++;
@@ -106,16 +107,15 @@ Point MyPlayer::make_move(const State &state) {
             bool can_immediate_win = false;
             bool can_immediate_open_four = false;
             bool must_immediate_def = false;
-            
+
             RatedMovePoint move = { {x, y}, 0.0, 0.0, 0.0, getDistanceToCenter(x, y, rows, cols) };
-            
             for (const auto dir : directions) {            
                 int dx = dir.dx;//D_X[d];
                 int dy = dir.dy;//D_Y[d];
                 
-                int max_atk_dir_weight = 0;
-                int max_def_dir_weight = 0;
-                
+                int atk_dir_weight = 0;
+                int def_dir_weight = 0;
+
                 for (int shift = 0; shift < win_len; shift++) {
                     int start_x = x - shift * dx;
                     int start_y = y - shift * dy;
@@ -136,17 +136,12 @@ Point MyPlayer::make_move(const State &state) {
                         if (cell == m_sign) count_my++;
                     }
                     
-                    if (!blocked_my) {
+                    if (!blocked_my && count_my > 0) {
                         if (count_my == win_len - 1) { can_immediate_win = true; }
-                        if (win_len == 5 && count_my == 3) {
-                            int res = check_line(state, start_x, start_y, dx, dy, win_len, true);
+                        atk_dir_weight = check_line(state, start_x, start_y, dx, dy, win_len, true);
+                        if (count_my == win_len - 2) {
                             if (open_before && open_after) { can_immediate_open_four = true; }
-                        }
-                        
-                        int res = check_line(state, start_x, start_y, dx, dy, win_len, true);
-                        if (res > max_atk_dir_weight) {
-                            max_atk_dir_weight = res;
-                        }
+                        }                        
                     }
                     
                     // Анализ Защиты
@@ -158,22 +153,17 @@ Point MyPlayer::make_move(const State &state) {
                         if (cell == opponent_sign) count_op++;
                     }
                     
-                    if (!blocked_op) {
-                        if (count_op == win_len - 1) { must_immediate_def = true; }
-                        
-                        int res = check_line(state, start_x, start_y, dx, dy, win_len, false);
-                        if (res > max_def_dir_weight) {
-                            max_def_dir_weight = res;
-                        }
+                    if (!blocked_op && count_op > 0) {
+                        if (count_op == win_len - 1) { must_immediate_def = true; }                        
+                        def_dir_weight = check_line(state, start_x, start_y, dx, dy, win_len, false);
                     }
+
+                    move.atk_weight += atk_dir_weight;
+                    move.def_weight += def_dir_weight;
                 }
                 
-                move.atk_weight += max_atk_dir_weight;
-                move.def_weight += max_def_dir_weight;
             }
-            
             move.weight = (move.atk_weight * ATK_COEFF) + (move.def_weight * DEF_COEFF);
-            
             if (can_immediate_win)       immediate_win.push_back(move);
             if (can_immediate_open_four) immediate_open_four.push_back(move);
             if (must_immediate_def)      immediate_def.push_back(move);
@@ -186,6 +176,9 @@ Point MyPlayer::make_move(const State &state) {
     auto weight_comparator = [](const RatedMovePoint& a, const RatedMovePoint& b) {
         if (std::abs(a.weight - b.weight) > 0.0001) {
             return a.weight > b.weight;
+        }
+        if (std::abs(a.atk_weight - b.atk_weight) > 0.0001) {
+            return a.atk_weight > b.atk_weight;
         }
         return a.distance < b.distance;
     };
