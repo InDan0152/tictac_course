@@ -187,11 +187,17 @@ Point MyPlayer::make_move(const State &state) {
         if (std::abs(a.atk_weight - b.atk_weight) > 0.0001) {
             return a.atk_weight > b.atk_weight;
         }
+        if (std::abs(a.def_weight - b.def_weight) > 0.0001) {
+            return a.def_weight > b.def_weight;
+        }
         return a.distance < b.distance;
     };
     auto def_weight_comparator = [](const RatedMovePoint& a, const RatedMovePoint& b) {
         if (std::abs(a.def_weight - b.def_weight) > 0.0001) {
             return a.def_weight > b.def_weight;
+        }
+        if (std::abs(a.atk_weight - b.atk_weight) > 0.0001) {
+            return a.atk_weight > b.atk_weight;
         }
         return a.distance < b.distance;
     };
