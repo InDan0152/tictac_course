@@ -231,15 +231,16 @@ Point MyPlayer::make_move(const State &state) {
             }
         }
         if (atk_moves.size() > 1) {
-           for (size_t i = 0; i < atk_moves.size(); ++i) {
-                for (size_t j = i + 1; j < atk_moves.size(); ++j) {
+           for (int dis = win_len-1; dis >= 0; dis--) { //цикл по дистанции между клетками от макс (win_len-1) до мин (0)
+             for (size_t i = 0; i < atk_moves.size(); i++) {
+                for (size_t j = i + 1; j < atk_moves.size(); j++) {
                     const auto& m1 = atk_moves[i];
                     const auto& m2 = atk_moves[j];
                     int dx = m2.point.x - m1.point.x;
                     int dy = m2.point.y - m1.point.y;
                     bool same_line = (dx == 0 || dy == 0 || std::abs(dx) == std::abs(dy));// m1 и m2 на одной линии
                     int distance = std::max(std::abs(dx), std::abs(dy));// расстояние между m1 и m2
-                    if (same_line && distance > 1 && distance < win_len) {
+                    if (same_line && distance == dis) {
                         int step_x = (dx > 0) ? 1 : ((dx < 0) ? -1 : 0);
                         int step_y = (dy > 0) ? 1 : ((dy < 0) ? -1 : 0);
                         int near_m1 = 0; // количество наших крестиков рядом с m1
@@ -277,7 +278,8 @@ Point MyPlayer::make_move(const State &state) {
                         }
                     }
                 }
-            }
+             }
+           }
         }
         return moves[0].point;
     }    
@@ -313,9 +315,6 @@ Point MyPlayer2::make_move(const State &state) {
     if (has_neighbors)
       break;
   }
-  //result.x=2;
-  //result.y=temp++;
-  //if (temp==4) temp++;
   return result;
 }
 
