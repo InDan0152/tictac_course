@@ -75,7 +75,7 @@ int  MyPlayer::check_line(const State &state, int start_x, int start_y, int dx, 
         for (int i=0; i < count; i++){
             weight*=5; 
         }
-        if (open_before && open_after) weight *= 5; //*5 если открыта
+        if (open_before && open_after) weight *= 2; //*2 если открыта
         return weight;
     }
     else{
