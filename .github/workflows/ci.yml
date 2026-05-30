@@ -24,4 +24,4 @@ jobs:
             - name: Run My Tests
               run: |
                   cd build
-                  ctest --output-on-failure -R "test_evaluation|test_board|test_pattern_table"
+                  ctest --output-on-failure
